@@ -8,6 +8,11 @@ defmodule Day08 do
   #@cols 7 #example
   @cols 50
 
+  def update_tuple(tuple, idx, fun) do
+    current = elem(tuple, idx)
+    put_elem(tuple, idx, fun.(current))
+  end
+
   def part1 do
     @example
     File.read!("data/day08.txt")
@@ -29,8 +34,7 @@ defmodule Day08 do
   end
 
   def proc_instr({:rect, {cols,rows}}, screen), do: rect(screen, cols, rows)
-  def proc_instr({:row, {row,amount}}, screen), do: row(screen, row, amount)
-  def proc_instr({:col, {col,amount}}, screen), do: col(screen, col, amount)
+  def proc_instr({row_or_col, {num,amount}}, screen), do: rotate(screen, row_or_col, num, amount)
 
   def rect(screen, cols, rows) do
     coords = for x <- 0..cols-1, y <-0..rows-1 do
@@ -40,26 +44,25 @@ defmodule Day08 do
     reduce(coords, screen, fn coord, scrn -> Map.put(scrn, coord, 1) end)
   end
 
-  def row(screen, row_num, amount) do
-    row = Map.filter(screen, fn {{_x, y}, _} -> y == row_num end)
-    others = Map.filter(screen, fn {{_x, y}, _} -> y != row_num end)
+  def rotate(screen, row_or_col, num, amount) do
+    {f, m, wrap} = case row_or_col do
+                           :col -> {0, 1, @rows}
+                           :row -> {1, 0, @cols}
+                         end
 
-    map(row, fn {{x, y}, v} -> {{rem(x+amount, @cols), y}, v} end) |> Map.new
-    |> Map.merge(others)
-  end
+    push = fn a -> rem(a+amount, wrap) end
 
-  def col(screen, col_num, amount) do
-    col = Map.filter(screen, fn {{x, _y}, _} -> x==col_num end)
-    others = Map.filter(screen, fn {{x, _y}, _} -> x != col_num end)
-
-    map(col, fn {{x, y}, v} -> {{x, rem(y+amount, @rows)}, v} end) |> Map.new
-    |> Map.merge(others)
+    change = Map.filter(screen, fn {c, _} -> elem(c,f) == num end)
+    change
+    |> map(fn {c, v} -> {update_tuple(c, m, push), v} end)
+    |> Map.new
+    |> Map.merge(Map.drop(screen, Map.keys(change)))
   end
 
   def draw(screen) do
     for y<-0..@rows-1 do
       for x<-0..@cols-1 do
-        if screen[{x,y}], do: "x", else: "."
+        if screen[{x,y}], do: "X", else: " "
       end
     end
     |> map(&join/1)
