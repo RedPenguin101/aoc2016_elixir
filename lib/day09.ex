@@ -1,19 +1,7 @@
 defmodule Day09 do
   import Enum
 
-  @examples ["ADVENT", "A(1x5)BC", "(3x3)XYZ", "A(2x2)BCD(2x2)EFG",
-             "(6x1)(1x3)A", "X(8x2)(3x3)ABCY"]
-  @examples_out ["ADVENT", "ABBBBBC", "XYZXYZXYZ", "ABCBCDEFEFG",
-                 "(1x3)A", "X(3x3)ABC(3x3)ABCY"]
-
-
   def part1 do
-    @examples
-    |> map(&to_charlist/1)
-    |> map(&decompress/1)
-    |> map(&to_string/1)
-    |> Kernel.==(@examples_out)
-
     File.read!("data/day09.txt")
     |> String.trim
     |> to_charlist
@@ -30,23 +18,23 @@ defmodule Day09 do
   def decomp_count(""), do: 0
 
   def decomp_count("(" <> rst) do
-    alias String, as: S
+    [l, chars, reps] = Regex.run(~r/(\d+)x(\d+)/, rst)
 
-    re = ~r/(\d+)x(\d+)/
-    [l, chars, reps] = Regex.run(re, rst)
-    reps  = S.to_integer(reps)
-    chars = S.to_integer(chars)
-    len   = S.length(l)+1
+    s_len    = String.length(l)+1
+    full_len = String.length(rst)
+    reps     = String.to_integer(reps)
+    chars_to_take = String.to_integer(chars)
+
     reps *
-      decomp_count(S.slice(rst, len, chars)) +
-      decomp_count(S.slice(rst, len+chars..S.length(rst)))
+      decomp_count(String.slice(rst, s_len, chars_to_take)) +
+      decomp_count(String.slice(rst, s_len+chars_to_take..full_len))
   end
 
   def decomp_count(string) do
-    alias String, as: S
+    s_len    = ~r/[A-Z]+/ |> Regex.run(string) |> hd |> String.length
+    full_len = String.length(string)
 
-    s = Regex.run(~r/[A-Z]+/, string) |> hd |> S.length
-    s + decomp_count(S.slice(string, s..S.length(string)))
+    s_len + decomp_count(String.slice(string, s_len..full_len))
   end
 
   def decompress(charlist), do: decompress([], charlist)
