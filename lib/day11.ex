@@ -6,30 +6,11 @@ defmodule Day11 do
              3 => MapSet.new(["LG"]),
              4 => MapSet.new([])}
 
-  # The first floor contains
-  #   a thulium generator,
-  #   a thulium-compatible microchip,
-  #   a plutonium generator,
-  #   a strontium generator.
-  # The second floor contains
-  #   a plutonium-compatible microchip and
-  #   a strontium-compatible microchip.
-  # The third floor contains
-  #   a promethium generator,
-  #   a promethium-compatible microchip,
-  #   a ruthenium generator, and
-  #   a ruthenium-compatible microchip.
   @input %{:elevator => 1,
            1 => MapSet.new(["TG", "TM", "PG", "SG"]),
            2 => MapSet.new(["PM", "SM"]),
            3 => MapSet.new(["pG", "pM", "RG", "RM"]),
            4 => MapSet.new([])}
-
-  # Also On the first floor:
-  #   An elerium generator.
-  #   An elerium-compatible microchip.
-  #   A dilithium generator.
-  #   A dilithium-compatible microchip.
 
   @input2 %{:elevator => 1,
             1 => MapSet.new(["TG", "TM", "PG", "SG", "EG", "EM", "DG", "DM"]),
@@ -41,92 +22,101 @@ defmodule Day11 do
     search(@input)
   end
 
-  def winner_from(state) do
+  def winner_from(floors) do
     %{:elevator => 4,
       1 => MapSet.new([]),
       2 => MapSet.new([]),
       3 => MapSet.new([]),
-      4 => MapSet.new(concat([state[1],state[2],state[3],state[4]]))}
+      4 => MapSet.new(concat([floors[1],floors[2],floors[3],floors[4]]))}
   end
 
   # https://eddmann.com/posts/advent-of-code-2016-day-11-radioisotope-thermoelectric-generators/
   # floor can simply be represented as a unique state based on the total
   # number of generators and microchips that are on that floor (each pair
   # are replaceable).
-  def count_floor_objects(state) do
+  def unique_state(floors) do
     cfo = fn floor -> floor |> map(fn <<_, t>> -> t end) |> frequencies() end
-    reduce(1..4, state, &Map.update!(&2, &1, cfo))
+    reduce(1..4, floors, &Map.update!(&2, &1, cfo))
   end
 
-  def search(init_state) do
-    movelist = [{[], init_state,0}]
-    seen_states =  MapSet.new([count_floor_objects(init_state)])
-    search(movelist, winner_from(init_state), seen_states)
+  def search(init_floors) do
+    movelist    = [{[], init_floors, 0}]
+    seen_states =  MapSet.new([unique_state(init_floors)])
+
+    search(movelist, winner_from(init_floors), seen_states)
   end
 
-  def search([nxt|other_movelists], winner, seen_states) do
-    winner? = fn {_, st, _} -> st == winner end
-    new_mls = new_movelists(nxt, seen_states)
+  def search([next_ml | other_movelists], winner, seen_states) do
+    new_mls = new_movelists(next_ml, seen_states)
 
-    w = find(new_mls, false, winner?)
+    new_seen_states = new_mls
+                      |> map(&elem(&1, 1))
+                      |> map(&unique_state/1)
+                      |> MapSet.new()
+                      |> MapSet.union(seen_states)
 
-    new_seen = new_mls
-               |> map(&elem(&1, 1))
-               |> map(&count_floor_objects/1)
-               |> MapSet.new()
-               |> MapSet.union(seen_states)
+    win? = find(new_mls, false, fn {_, flrs, _} -> flrs == winner end)
 
     cond do
-      w -> w
-      :else -> search(other_movelists++new_mls, winner, new_seen)
+      win? -> win?
+      :else -> search(other_movelists++new_mls, winner, new_seen_states)
     end
   end
 
-  def new_movelists({move_seq, state, count}, seen_states) do
-    state
-    |> options
-    |> map(&{[&1|move_seq], new_state(state, &1), count+1})
-    |> reject(&(MapSet.member?(seen_states, count_floor_objects(elem(&1, 1)))))
+  def new_movelists({move_seq, floors, count}, seen_states) do
+    movelist_from_move = fn move -> {[move | move_seq], apply_move(floors, move), count+1} end
+    seen? = fn {_,floors2,_} -> MapSet.member?(seen_states, unique_state(floors2)) end
+
+    floors
+    |> options_for_move
+    |> map(movelist_from_move)
+    |> reject(seen?)
   end
 
-  def options(state) do
-    state
-    |> moves
-    |> filter(fn mv -> safe?(new_state(state, mv)) end)
-  end
+  def options_for_move(floors) do
+    safe? = fn floors ->
+      floors |> Map.delete(:elevator) |> Map.values |> Enum.all?(&floor_safe?/1)
+    end
 
-  def safe?(state) do
-    state |> Map.delete(:elevator) |> Map.values |> Enum.all?(&floor_safe?/1)
+    only_safe = fn move -> safe?.(apply_move(floors, move)) end
+
+    floors
+    |> find_moves
+    |> filter(only_safe)
   end
 
   def floor_safe?(floor) do
-    chip? = fn s -> String.ends_with?(s, "M") end
-    gen_of = fn <<x, "M">> -> <<x, "G">> end
+    is_chip? = fn s -> String.ends_with?(s, "M") end
+    gen_of_chip = fn <<x, "M">> -> <<x, "G">> end
 
-    chips = floor |> filter(chip?)
-    gens =  floor |> reject(chip?)
-    needed_gens =  map(chips, gen_of) |> MapSet.new()
+    chips = floor |> filter(is_chip?)
+    gens =  floor |> reject(is_chip?)
+    needed_gens =  chips |> map(gen_of_chip) |> MapSet.new()
+
     empty?(gens) || MapSet.subset?(needed_gens, floor)
   end
 
-  def new_state(state, {mv, cargo}) do
-    new_floor = state.elevator + mv
+  def apply_move(floors, {direction, cargo}) do
+    floor =  floors.elevator
+    new_floor = floor + direction
+    add_cargo = &(MapSet.union(&1, cargo))
+    remove_cargo = &(MapSet.difference(&1, cargo))
 
-    state
-    |> Map.update!(new_floor, &(MapSet.union(&1, cargo)))
-    |> Map.update!(state.elevator, &(MapSet.difference(&1, cargo)))
+    floors
     |> Map.put(:elevator, new_floor)
+    |> Map.update!(new_floor, add_cargo)
+    |> Map.update!(floor, remove_cargo)
   end
 
-  def moves(state) do
-    ss = state[state.elevator]
-         |> Combo.subsets()
-         |> filter(&(MapSet.size(&1) < 3))
+  def find_moves(floors) do
+    things_to_move = floors[floors.elevator]
+                     |> Combo.subsets()
+                     |> filter(&(MapSet.size(&1) < 3))
 
-    case state.elevator do
-      1 -> map(ss, &{1, &1})
-      4 -> map(ss, &{-1, &1})
-      _ -> map(ss, &{-1, &1}) ++ map(ss, &{1, &1})
+    case floors.elevator do
+      1 -> map(things_to_move, &{1, &1})
+      4 -> map(things_to_move, &{-1, &1})
+      _ -> map(things_to_move, &{-1, &1}) ++ map(things_to_move, &{1, &1})
     end
   end
 end
