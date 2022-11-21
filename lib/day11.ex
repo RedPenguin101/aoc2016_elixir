@@ -1,33 +1,76 @@
 defmodule Day11 do
   import Enum
-  @example %{:elevator => 1,
-             1 => MapSet.new(["HM", "LM"]),
-             2 => MapSet.new(["HG"]),
-             3 => MapSet.new(["LG"]),
-             4 => MapSet.new([])}
+  import MapSet, only: [union: 2, difference: 2]
+  import Map,    only: [update!: 3, values: 1, put: 3, delete: 2]
 
-  @input %{:elevator => 1,
-           1 => MapSet.new(["TG", "TM", "PG", "SG"]),
-           2 => MapSet.new(["PM", "SM"]),
-           3 => MapSet.new(["pG", "pM", "RG", "RM"]),
-           4 => MapSet.new([])}
+  # convenience utils
+  def first(tuple),  do: elem(tuple, 0)
+  def second(tuple), do: elem(tuple, 1)
+  def last(tuple),   do: elem(tuple, tuple_size(tuple)-1)
+  def empty_set,     do: set([])
+  def set(xs),       do: MapSet.new(xs)
 
-  @input2 %{:elevator => 1,
-            1 => MapSet.new(["TG", "TM", "PG", "SG", "EG", "EM", "DG", "DM"]),
-            2 => MapSet.new(["PM", "SM"]),
-            3 => MapSet.new(["pG", "pM", "RG", "RM"]),
-            4 => MapSet.new([])}
+  def part1 do
+    init_state =  %{:elevator => 1,
+                    1 => set(["TG", "TM", "PG", "SG"]),
+                    2 => set(["PM", "SM"]),
+                    3 => set(["pG", "pM", "RG", "RM"]),
+                    4 => empty_set()}
 
-  def scratch do
-    search(@input)
+    init_state |> search |> last
   end
 
-  def winner_from(floors) do
+  def part2 do
+    init_state =  %{:elevator => 1,
+                    1 => set(["TG", "TM", "PG", "SG", "EG", "EM", "DG", "DM"]),
+                    2 => set(["PM", "SM"]),
+                    3 => set(["pG", "pM", "RG", "RM"]),
+                    4 => empty_set()}
+    init_state |> search |> last
+  end
+
+  def target_state(floors) do
+    all = [floors[1],floors[2],floors[3],floors[4]] |> concat |> set
+
     %{:elevator => 4,
-      1 => MapSet.new([]),
-      2 => MapSet.new([]),
-      3 => MapSet.new([]),
-      4 => MapSet.new(concat([floors[1],floors[2],floors[3],floors[4]]))}
+      1 => empty_set(),
+      2 => empty_set(),
+      3 => empty_set(),
+      4 => all}
+  end
+
+  def search(init_floors) do
+    init_path   = {[], init_floors, 0}
+    seen_states =  set([unique_state(init_floors)])
+
+    search([init_path], target_state(init_floors), seen_states)
+  end
+
+  def search([path | other_paths], winner, seen_states) do
+    new_paths = find_new_paths(path, seen_states)
+
+    new_seen_states = new_paths
+                      |> map(&second/1)
+                      |> map(&unique_state/1)
+                      |> set()
+                      |> union(seen_states)
+
+    win? = find(new_paths, false, fn {_, flrs, _} -> flrs == winner end)
+
+    cond do
+      win? -> win?
+      :else -> search(other_paths++new_paths, winner, new_seen_states)
+    end
+  end
+
+  def find_new_paths({move_seq, floors, count}, seen_states) do
+    path_from_move = fn move -> {[move | move_seq], apply_move(floors, move), count+1} end
+    seen? = fn {_,floors2,_} -> member?(seen_states, unique_state(floors2)) end
+
+    floors
+    |> safe_moves
+    |> map(path_from_move)
+    |> reject(seen?)
   end
 
   # https://eddmann.com/posts/advent-of-code-2016-day-11-radioisotope-thermoelectric-generators/
@@ -36,46 +79,24 @@ defmodule Day11 do
   # are replaceable).
   def unique_state(floors) do
     cfo = fn floor -> floor |> map(fn <<_, t>> -> t end) |> frequencies() end
-    reduce(1..4, floors, &Map.update!(&2, &1, cfo))
+    reduce(1..4, floors, &update!(&2, &1, cfo))
   end
 
-  def search(init_floors) do
-    movelist    = [{[], init_floors, 0}]
-    seen_states =  MapSet.new([unique_state(init_floors)])
-
-    search(movelist, winner_from(init_floors), seen_states)
-  end
-
-  def search([next_ml | other_movelists], winner, seen_states) do
-    new_mls = new_movelists(next_ml, seen_states)
-
-    new_seen_states = new_mls
-                      |> map(&elem(&1, 1))
-                      |> map(&unique_state/1)
-                      |> MapSet.new()
-                      |> MapSet.union(seen_states)
-
-    win? = find(new_mls, false, fn {_, flrs, _} -> flrs == winner end)
-
-    cond do
-      win? -> win?
-      :else -> search(other_movelists++new_mls, winner, new_seen_states)
-    end
-  end
-
-  def new_movelists({move_seq, floors, count}, seen_states) do
-    movelist_from_move = fn move -> {[move | move_seq], apply_move(floors, move), count+1} end
-    seen? = fn {_,floors2,_} -> MapSet.member?(seen_states, unique_state(floors2)) end
+  def apply_move(floors, {direction, cargo}) do
+    current_floor =  floors.elevator
+    new_floor = current_floor + direction
+    add_cargo = &(union(&1, cargo))
+    remove_cargo = &(difference(&1, cargo))
 
     floors
-    |> options_for_move
-    |> map(movelist_from_move)
-    |> reject(seen?)
+    |> put(:elevator, new_floor)
+    |> update!(new_floor, add_cargo)
+    |> update!(current_floor, remove_cargo)
   end
 
-  def options_for_move(floors) do
+  def safe_moves(floors) do
     safe? = fn floors ->
-      floors |> Map.delete(:elevator) |> Map.values |> Enum.all?(&floor_safe?/1)
+      floors |> delete(:elevator) |> values |> all?(&floor_safe?/1)
     end
 
     only_safe = fn move -> safe?.(apply_move(floors, move)) end
@@ -91,21 +112,9 @@ defmodule Day11 do
 
     chips = floor |> filter(is_chip?)
     gens =  floor |> reject(is_chip?)
-    needed_gens =  chips |> map(gen_of_chip) |> MapSet.new()
+    needed_gens =  chips |> map(gen_of_chip) |> set()
 
     empty?(gens) || MapSet.subset?(needed_gens, floor)
-  end
-
-  def apply_move(floors, {direction, cargo}) do
-    floor =  floors.elevator
-    new_floor = floor + direction
-    add_cargo = &(MapSet.union(&1, cargo))
-    remove_cargo = &(MapSet.difference(&1, cargo))
-
-    floors
-    |> Map.put(:elevator, new_floor)
-    |> Map.update!(new_floor, add_cargo)
-    |> Map.update!(floor, remove_cargo)
   end
 
   def find_moves(floors) do
