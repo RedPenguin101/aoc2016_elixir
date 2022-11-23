@@ -1,4 +1,5 @@
 defmodule Utils do
+  import Enum
 
   # tuple convenience
   def first(tuple),  do: elem(tuple, 0)
@@ -26,4 +27,22 @@ defmodule Utils do
   def most_common({_n1, f1}, {_n2, f2}) when f1 > f2, do: true
   def most_common({_n1, f1}, {_n2, f2}) when f1 < f2, do: false
   def most_common({n1, f1}, {n2, f2})   when f1 == f2, do: n1 <= n2
+
+  # Coordinates etc
+
+  @doc "Given a set of coordinates {x>0,y>0}, will draw them on the screen"
+  def draw(coords) do
+    {_xmin, xmax} = coords |> map(&first/1) |> min_max
+    {_ymin, ymax} = coords |> map(&second/1) |> min_max
+
+    for y<-0..ymax do
+      for x<-0..xmax do
+        if MapSet.member?(coords, {x,y}), do: "#", else: " "
+      end
+    end
+
+    |> map(&join/1)
+    |> join("\n")
+    |> IO.puts
+  end
 end
