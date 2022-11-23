@@ -1,13 +1,8 @@
 defmodule Day07 do
   import Enum
+  import Utils
   @examples ["abba[mnop]qrst","abcd[bddb]xyyx","aaaa[qwer]tyui","ioxxoj[asdfgh]zxcvbn"]
   @examples2 ["aba[bab]xyz","xyx[xyx]xyx","aaa[kek]eke","zazbz[bzb]cdb"]
-
-  def unterleave(list, n) do
-    for i <- 0..n-1 do
-      take_every(drop(list, i), n)
-    end
-  end
 
   def part1 do
     @examples

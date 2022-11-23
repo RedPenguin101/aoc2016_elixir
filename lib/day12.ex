@@ -1,15 +1,15 @@
 defmodule Day12 do
   import Enum
+  import Utils
 
-  @registers  %{"a" => 0, "b" => 0, "c" => 0, "d" => 0,}
-  @registers2 %{"a" => 0, "b" => 0, "c" => 1, "d" => 0,}
+  @registers  %{"a" => 0, "b" => 0, "c" => 0, "d" => 0}
+  @registers2 %{"a" => 0, "b" => 0, "c" => 1, "d" => 0}
 
   def run do
     instructions = File.read!("data/day12.txt")
                    |> String.trim
                    |> String.split("\n")
-                   |> map(&String.split/1)
-                   |> map(&List.to_tuple/1)
+                   |> map(compose(&String.split/1, &List.to_tuple/1))
                    |> List.to_tuple()
 
     %{"a" => a} = process(@registers, 0, instructions)

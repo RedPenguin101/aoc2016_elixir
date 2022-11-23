@@ -1,10 +1,11 @@
 defmodule Day06 do
   import Enum
+  import Utils
 
   @example "eedadn\ndrvtee\neandsr\nraavrd\natevrs\ntsrnev\nsdttsa\nrasrtv\nnssdts\nntnada\nsvetve\ntesnvt\nvntsnd\nvrdear\ndvrsen\nenarar"
 
   def part1 do
-    get_max = fn m -> Enum.max(Map.to_list(m), &(elem(&1,1) >= elem(&2,1))) |> elem(0) end
+    get_max = fn m -> Enum.max(Map.to_list(m), fn a, b -> second(a) >= second(b) end) |> first end
 
     #@example
     File.read!("data/day06.txt")
@@ -18,7 +19,7 @@ defmodule Day06 do
   end
 
   def part2 do
-    get_min = fn m -> Enum.min(Map.to_list(m), &(elem(&1,1) < elem(&2,1))) |> elem(0) end
+    get_min = fn m -> Enum.min(Map.to_list(m), fn a, b -> second(a) < second(b) end) |> elem(0) end
 
     #@example
     File.read!("data/day06.txt")

@@ -1,5 +1,6 @@
 defmodule Aoc2016.Day04 do
   import Enum
+  import Utils
 
   @example  ["aaaaa-bbb-z-y-x-123[abxyz]",
              "a-b-c-d-e-f-g-h-987[abcde]",
@@ -19,8 +20,8 @@ defmodule Aoc2016.Day04 do
     to_charlist(name)
     |> filter(&(&1 != ?-))
     |> frequencies
-    |> sort(&custom_sort/2)
-    |> map(&elem(&1, 0))
+    |> sort(&most_common/2)
+    |> map(&first/1)
     |> take(5)
     |> Kernel.==(to_charlist(check))
   end
@@ -49,8 +50,8 @@ defmodule Aoc2016.Day04 do
     |> map(&parse_room_code/1)
     |> filter(&real_room?/1)
     |> map(&decode/1)
-    |> filter(&(elem(&1, 0) |> String.starts_with?("northpole")))
+    |> filter(&(&1 |> first |> String.starts_with?("northpole")))
     |> hd
-    |> elem(1)
+    |> second
   end
 end

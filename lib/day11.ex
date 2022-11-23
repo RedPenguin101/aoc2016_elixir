@@ -2,13 +2,9 @@ defmodule Day11 do
   import Enum
   import MapSet, only: [union: 2, difference: 2]
   import Map,    only: [update!: 3, values: 1, put: 3, delete: 2]
+  import Utils
 
-  # convenience utils
-  def first(tuple),  do: elem(tuple, 0)
-  def second(tuple), do: elem(tuple, 1)
-  def last(tuple),   do: elem(tuple, tuple_size(tuple)-1)
   def empty_set,     do: set([])
-  def set(xs),       do: MapSet.new(xs)
 
   def part1 do
     init_state =  %{:elevator => 1,
